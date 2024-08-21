@@ -1,0 +1,37 @@
+version: "3"
+services:
+  contacts-test-db:
+    restart: always
+    container_name: contacts_meili_sync_test_db
+    image: "supabase/postgres:15.1.1.80"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=p@ssw0rd
+      - POSTGRES_DB=Contacts_db
+      - POSTGRES_MAX_WAL_SENDERS=20
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./dbData/contacts:/var/lib/postgresql/data/
+    networks:
+      - my-network
+
+  identity-test-db:
+    restart: always
+    container_name: identity_meili_sync_test_db
+    image: "supabase/postgres:15.1.1.80"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=identityp@ssw0rd
+      - POSTGRES_DB=Identity_db
+      - POSTGRES_MAX_WAL_SENDERS=20
+    ports:
+      - "15432:5432"
+    volumes:
+      - ./dbData/identity:/var/lib/postgresql/data/
+    networks:
+      - my-network
+
+networks:
+  my-network:
+    external: true

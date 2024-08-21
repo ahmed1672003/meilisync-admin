@@ -1,0 +1,19 @@
+version: "3"
+services:
+  # Meilisync Admin Service
+  meilisync-admin:
+    image: zeyadsortech/custom-meilisync-admin:latest
+    container_name: meilisync_admin
+    restart: always
+    ports:
+      - "8000:8000"
+    networks:
+      - my-network
+    environment:
+      - DB_URL=mysql://root:mauFJcuf5dhRMQrjj@meilisyncdb:3306/meilisync_admin
+      - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=MyMeiliAdminSecret
+      - SENTRY_DSN=
+networks:
+  my-network:
+    external: true

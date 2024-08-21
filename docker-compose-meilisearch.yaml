@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  meilisearch:
+    image: getmeili/meilisearch:latest
+    container_name: meilisearch
+    ports:
+      - "7700:7700"
+    volumes:
+      - meilisearch_data_sync:/meili_data_sync
+    networks:
+      - my-network
+    restart: always
+volumes:
+  meilisearch_data_sync:
+networks:
+  my-network:
+    external: true

@@ -1,0 +1,21 @@
+version: "3"
+services:
+  meilisyncdb:
+    image: mysql
+    container_name: meilisyncdb
+    networks:
+      - my-network
+    environment:
+      - MYSQL_DATABASE=meilisync_admin
+      - MYSQL_ROOT_PASSWORD=mauFJcuf5dhRMQrjj
+    ports:
+      - "3306:3306"
+    volumes:
+      - db1:/var/lib/mysql
+networks:
+  my-network:
+    external: true
+volumes:
+  db1:
+    driver: local
+

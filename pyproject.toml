@@ -13,7 +13,7 @@ repository = "https://github.com/meilisync/meilisync-admin.git"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-meilisync = { git = "https://github.com/long2ice/meilisync.git", extras = ["all"] }
+meilisync = { git = "https://github.com/zeyaddiaa/meilisync.git", extras = ["all"] }
 tortoise-orm = "*"
 aerich = "*"
 fastapi = { version = "*", extras = ["all"] }
@@ -25,6 +25,7 @@ authlib = "*"
 sentry-sdk = { version = "*", extras = ["fastapi"] }
 pydantic-settings = "*"
 meilisearch-python-sdk = { git = "https://github.com/long2ice/meilisearch-python-sdk.git" }
+asyncpg="*"
 
 [tool.poetry.group.dev.dependencies]
 black = "*"

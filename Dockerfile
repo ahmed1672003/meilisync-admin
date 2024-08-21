@@ -17,4 +17,6 @@ COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/pytho
 COPY --from=builder /usr/local/bin/ /usr/local/bin/
 COPY . /meilisync_admin
 COPY --from=frontend-builder /meilisync-web/dist /meilisync_admin/static
+COPY /json_encoder/encoder.py /usr/local/lib/python3.12/json/encoder.py
+
 CMD ["python", "-m", "meilisync_admin.app"]
