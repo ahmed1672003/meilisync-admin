@@ -1,4 +1,7 @@
 import asyncio
+from concurrent.futures import ThreadPoolExecutor
+import time
+
 from asyncio import CancelledError, Task
 from typing import Dict, List, Tuple
 
@@ -131,9 +134,17 @@ class Runner:
                 self.stats.clear()
 
     async def _save_progress(self):
-        await self.progress.set(**self.current_progress)
-
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=5)
+        await loop.run_in_executor(
+            executor, self.progress.set, **self.current_progress
+        )
+         
+#
     async def sync_data(self):
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=5) 
+
         while True:
             event = await self.queue.get()
             self.current_progress = event.progress
@@ -150,47 +161,71 @@ class Runner:
                     self.stats.setdefault(sync_model.pk, {}).setdefault(event.type, 0)
                     self.stats[sync_model.pk][event.type] += 1
                     if not meilisearch.insert_size and not meilisearch.insert_interval:
-                        await m.handle_event(event, ss)
+                        await loop.run_in_executor(
+                            executor, m.handle_event, event, ss
+                        )
                         await self._save_progress()
+
                     else:
                         collection = self.collections_map[ss]
                         collection.add_event(ss, event)
                         if collection.size >= meilisearch.insert_size:
-                            await m.handle_events(collection)
+                            await loop.run_in_executor(
+                                executor, m.handle_events, collection
+                            )
                             await self._save_progress()
-
+#
     async def listen(self):
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=5)
         logger.info(
             f'Start increment sync data from "{self.source.label}" to Meilisearch,'
             f' tables: {", ".join(self.tables_sync_settings_map.keys())}...'
         )
         async for event in self.source_obj:
             logger.debug(event)
-            await self.queue.put(event)
+            await loop.run_in_executor(
+                executor, self.queue.put_nowait, event
+            )
 
     async def start_interval(self, m: Meili, c: EventCollection, interval: int):
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=5)
+
         while True:
             await asyncio.sleep(interval)
             try:
                 async with self.lock:  # type: ignore
                     size = c.size
-                    await m.handle_events(c)
+                    await loop.run_in_executor(
+                        executor, m.handle_events, c
+                    )
+
                     if size > 0:
                         await self._save_progress()
             except Exception as e:
                 logger.error(f"Error when insert data to Meilisearch: {e}")
 
     async def run(self):
-        await asyncio.gather(
-            self.save_stats(), self.sync_data(), self.listen(), *self._tasks
+        loop = asyncio.get_running_loop()
+        executor = ThreadPoolExecutor(max_workers=5)
+        await loop.run_in_executor(
+            executor,
+            asyncio.gather,
+            self.save_stats(),
+            self.sync_data(),
+            self.listen(),
+            *self._tasks
         )
 
 
 class Scheduler:
     _tasks: Dict[int, Task] = {}
+    _executor = ThreadPoolExecutor(max_workers=5) 
 
     @classmethod
     async def startup(cls):
+        loop = asyncio.get_running_loop()
         sources = await Source.all()
         for source in sources:
             cls._tasks[source.pk] = asyncio.ensure_future(cls._start_source(source))
@@ -220,7 +255,8 @@ class Scheduler:
 
     @classmethod
     async def restart_source(cls, source: Source):
+        loop = asyncio.get_running_loop()
         logger.info(f'Restart source "{source.label}"...')
         source_id = source.pk
-        cls.remove_source(source_id)
+        await loop.run_in_executor(cls._executor, cls.remove_source, source_id)
         cls._tasks[source_id] = asyncio.ensure_future(cls._start_source(source))

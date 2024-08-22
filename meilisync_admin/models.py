@@ -11,6 +11,8 @@ from tortoise import Model, fields
 
 from meilisync_admin.validators import EmailValidator
 
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 class BaseModel(Model):
     created_at = fields.DatetimeField(auto_now_add=True)
@@ -54,6 +56,7 @@ class Sync(BaseModel):
     fields = fields.JSONField(null=True)
     source_count: int
     meilisearch_count: int
+    _executor = ThreadPoolExecutor(max_workers=5)
 
     class Meta:
         unique_together = [("meilisearch", "source", "table")]
@@ -66,14 +69,32 @@ class Sync(BaseModel):
         )
 
     async def create_index(self):
-        await self.meili_client.client.create_index(self.index, self.primary_key)
-        await self.update_settings()
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(
+            self._executor, self._create_index_sync
+        )
+
+    def _create_index_sync(self):
+        client = self.meili_client.client
+        client.create_index(self.index, self.primary_key)
+        if self.index_settings:
+            client.index(self.index).update_settings(
+                MeilisearchSettings.model_validate(self.index_settings)
+        )
+
 
     async def update_settings(self):
         if self.index_settings:
-            await self.meili_client.client.index(self.index).update_settings(
-                MeilisearchSettings.model_validate(self.index_settings)
+            loop = asyncio.get_running_loop()
+            await loop.run_in_executor(
+                self._executor, self._update_settings_sync
             )
+
+    def _update_settings_sync(self):
+        client = self.meili_client.client
+        client.index(self.index).update_settings(
+            MeilisearchSettings.model_validate(self.index_settings)
+        )
 
     @property
     def sync_config(self):
@@ -86,9 +107,14 @@ class Sync(BaseModel):
         )
 
     async def get_count(self):
-        self.source_count = await self.source.get_source().get_count(self)
+        loop = asyncio.get_running_loop()
+        self.source_count = await loop.run_in_executor(
+            self._executor, self.source.get_source().get_count, self
+        )
         try:
-            self.meilisearch_count = await self.meili_client.get_count(self.index)
+            self.meilisearch_count = await loop.run_in_executor(
+                self._executor, self.meili_client.get_count, self.index
+            )
         except MeilisearchApiError as e:
             logger.exception(f'Failed to get count for index "{self.index}": {e}')
             self.meilisearch_count = 0
